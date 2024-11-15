@@ -15,13 +15,13 @@ describe "grupo de test para los consumos" {
 describe "grupo de test para los packs" {
 
   test "Un pack de 100MB libres satisface un consumo de internet de 5MB, pero no una llamada de 60" {
-    assert.that((new MBLibres(mbLibres = 100)).puedeCubrir(new ConsumoInternet(mb = 5)))
-    assert.that(!((new MBLibres(mbLibres = 100)).puedeCubrir(new ConsumoLlamada(segundos = 60))))
+    assert.that((new MBLibres(consumible = 100)).puedeCubrir(new ConsumoInternet(mb = 5)))
+    assert.that(!((new MBLibres(consumible = 100)).puedeCubrir(new ConsumoLlamada(segundos = 60))))
   }
 
   test "Un pack de 100 de credito puede satisfacer los dos" {
-    assert.that((new CreditoDisponible(credito = 100)).puedeCubrir(new ConsumoInternet(mb = 5)))
-    assert.that((new CreditoDisponible(credito = 100)).puedeCubrir(new ConsumoLlamada(segundos = 60)))
+    assert.that((new CreditoDisponible(consumible = 100)).puedeCubrir(new ConsumoInternet(mb = 5)))
+    assert.that((new CreditoDisponible(consumible = 100)).puedeCubrir(new ConsumoLlamada(segundos = 60)))
   }
 
 }
@@ -29,11 +29,12 @@ describe "grupo de test para los packs" {
 describe "grupo de test para las lineas" {
 
   test "La linea 156 no puede consumir 20MB de internet" {
-    const linea156 = new Linea(packs = [(new MBLibres(mbLibres = 10)),
-                                        (new CreditoDisponible(credito = 50)),
-                                        (new MBLibres(mbLibres = 200, vencimiento = new Date(day = 13, month = 10, year = 2019))),
-                                        (new MBLibres(mbLibres = 5)),
-                                        (new MBLibres(mbLibres = 15, vencimiento = new Date(day = 12, month = 12, year = 2019)))])
+    const linea156 = new Linea(packs = [(new MBLibres(consumible = 10)),
+                                        (new CreditoDisponible(consumible = 50)),
+                                        (new MBLibres(consumible = 200, vencimiento = new Date(day = 13, month = 10, year = 2019))),
+                                        (new MBLibres(consumible = 5)),
+                                        (new MBLibres(consumible = 15, vencimiento = new Date(day = 12, month = 12, year = 2019)))],
+                                        tipo = comun)
                                         
     assert.that(!(linea156.puedeConsumir(new ConsumoInternet(fecha = new Date(day = 12, month = 11, year = 2019), mb = 20))))
   }

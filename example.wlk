@@ -21,45 +21,44 @@ class ConsumoInternet inherits Consumo {
 class ConsumoLlamada inherits Consumo {
   const property segundos
   override method consumeInternet() = false
-  override method costo() = pdepfoni.precioFijo() + (segundos - 30) * pdepfoni.precioPorSegundo()
+  override method costo() = pdepfoni.precioFijo() + ((segundos - 30).max(0)) * pdepfoni.precioPorSegundo()
 }
 
 class Pack {
   const vencimiento = new Date()
 
-  method vencidoPara(consumo) = consumo.fecha() > vencimiento
-  method puedeCubrir(consumo) = !(self.vencidoPara(consumo))
+  method sePuedeUsar(fecha) = fecha < vencimiento
+
+  method puedeCubrir(consumo) = self.sePuedeUsar(consumo.fecha())
+  method cubrir(consumo) {}
 }
 
 class PackConsumible inherits Pack {
-  method gastar(consumo)
+  var consumible
+
+  override method sePuedeUsar(fecha) = super(fecha) && consumible > 0
 }
 
 class CreditoDisponible inherits PackConsumible {
-  var credito
+  override method puedeCubrir(consumo) = super(consumo) && consumo.costo() <= consumible
 
-  override method puedeCubrir(consumo) {
-    self.gastar(consumo)
-    return super(consumo) && consumo.costo() <= credito
-  }
-
-  override method gastar(consumo) {
-    if (super(consumo) && consumo.costo() <= credito) 
-      credito -= consumo.costo()
+  override method cubrir(consumo) {
+    if (self.puedeCubrir(consumo)) 
+      consumible -= consumo.costo()
   }
 }
 
 class MBLibres inherits PackConsumible {
-  var mbLibres
-  override method puedeCubrir(consumo) {
-    self.gastar(consumo)
-    return super(consumo) && consumo.consumeInternet() && consumo.mb() <= mbLibres
-  }
+  override method puedeCubrir(consumo) = super(consumo) && consumo.consumeInternet() && consumo.mb() <= consumible
 
-  override method gastar(consumo) {
-    if (super(consumo) && consumo.consumeInternet() && consumo.mb() <= mbLibres) 
-      mbLibres -= consumo.mb()
+  override method cubrir(consumo) {
+    if (self.puedeCubrir(consumo)) 
+      consumible -= consumo.mb()
   }
+}
+
+class MBLibresPlus inherits MBLibres {
+  override method puedeCubrir(consumo) = if (consumible > 0) super(consumo) else consumo.mb() <= 0.1
 }
 
 class LlamadasLibres inherits Pack {
@@ -72,8 +71,10 @@ class InternetLibreFindes inherits Pack {
 
 class Linea {
   const fechaActual = new Date()
-  const consumos = []
-  const packs = []
+  const property consumos = []
+  const property packs = []
+  var property deuda = 0
+  var property tipo
 
   method consumosEnPeriodo(inicio, fin) = consumos.filter({consumo => consumo.consumidoEntre(inicio, fin)})
   method gastoPromedio(inicio, fin) = self.consumosEnPeriodo(inicio, fin).sum({consumo => consumo.costo()}) / self.consumosEnPeriodo(inicio, fin).size()
@@ -85,12 +86,48 @@ class Linea {
 
   method puedeConsumir(consumo) = packs.any({pack => pack.puedeCubrir(consumo)})
   method packsQueCubren(consumo) = packs.filter({pack => pack.puedeCubrir(consumo)})
+  method packsVencidos() = packs.filter({pack => !(pack.sePuedeUsar(fechaActual))})
 
   method realizarConsumo(consumo) {
-    if (self.puedeConsumir(consumo)) {
-      consumos.add(consumo)
-      packs.remove(self.packsQueCubren(consumo).last())
+    if (tipo.permiteRealizarConsumo(self, consumo)) {
+      tipo.procesarConsumo(self, consumo)
     }
     else {throw new DomainException()}
+  }
+
+  method limpiarPacks() {
+    self.packsVencidos().forEach({packVencido => packs.remove(packVencido)})
+  }
+}
+
+object comun {
+  method permiteRealizarConsumo(linea, consumo) = linea.puedeConsumir(consumo)
+
+  method procesarConsumo(linea, consumo) {
+    linea.consumos().add(consumo)
+    linea.packsQueCubren(consumo).last().cubrir(consumo)
+  }
+}
+
+object black {
+  method permiteRealizarConsumo(linea, consumo) = true
+
+  method procesarConsumo(linea, consumo) {
+    if (linea.puedeConsumir(consumo)) {
+      linea.consumos().add(consumo)
+      linea.packsQueCubren(consumo).last().cubrir(consumo)
+    }
+    else {
+      linea.consumos().add(consumo)
+      linea.deuda(linea.deuda() + consumo.costo())
+    }
+  }
+}
+
+object platinum {
+  method permiteRealizarConsumo(linea, consumo) = true
+
+  method procesarConsumo(linea, consumo) {
+    linea.consumos().add(consumo)
   }
 }
